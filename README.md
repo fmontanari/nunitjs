@@ -72,6 +72,12 @@ print passed tests too
 
 print the current version
 
+Asynchronous Testing
+--------------------
+
+NUnitJS is designed to help you testing asynchronous code.
+
+
 
 setUp and tearDown
 --------------------------
