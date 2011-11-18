@@ -71,3 +71,45 @@ print passed tests too
 --version
 
 print the current version
+
+
+setUp and tearDown
+--------------------------
+
+NUnitJS allows you to define a `setUp` function, which is run before each test, and a `tearDown` function, which is run after each test calls `test.done()`:
+    
+    exports.setUp = function (setUp) {
+        this.foo = 'bar';
+        setUp.done();
+    };
+    
+    exports.tearDown = function (tearDown) {
+        // clean up
+        tearDown.done();
+    };
+    
+    exports.test1 = function (test) {
+        assert.equals(this.foo, 'bar');
+        test.done();
+    };
+
+
+fixtureSetUp and fixtureTearDown
+--------------------------
+
+NUnitJS allows you to define a `fixtureSetUp` function, which is run before each fixture, and a `fixtureTearDown` function, which is run after each fixture calls all tests:
+    
+    exports.fixtureSetUp = function (fixtureSetUp) {
+        this.foo = 'bar';
+        fixtureSetUp.done();
+    };
+    
+    exports.fixtureTearDown = function (fixtureTearDown) {
+        // clean up
+        fixtureTearDown.done();
+    };
+    
+    exports.test1 = function (test) {
+        assert.equals(this.foo, 'bar');
+        test.done();
+    };
