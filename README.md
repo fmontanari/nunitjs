@@ -38,7 +38,7 @@ When run, this will output the following:
   image
 
 
-Arguments
+Command-line arguments
 -----------------
 
 --path=[path],[path]
