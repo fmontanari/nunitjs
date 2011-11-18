@@ -31,7 +31,8 @@ sample_fixture.js
     };
 
 Here the command line to run:
-  node nunit.js --path="sample_fixture.js"
+
+    node nunit.js --path="sample_fixture.js"
 
 When run using the included test runner, this will output the following:
 
@@ -41,4 +42,21 @@ When run using the included test runner, this will output the following:
 Arguments
 -----------------
 
-*  --path : Path, folder or file, where to find fixture. Only file that ends with "_fixture.js" are executed. Multiple Path are allowed with comma separated.
+--path=[path],[path]
+
+Path, folder or file, where to find fixture. Only file that ends with "_fixture.js" are executed.
+Multiple Path are allowed with comma separated.
+
+    node nunit.js --path=testfolder
+    
+    node nunit.js --path=folder1,folder2
+    
+    node nunit.js --path=sample1_fixture.js,sample2_fixture.js
+
+--test=[test name]
+
+Test function name to execute only
+
+    node nunit.js --path=sample_fixture.js --test=testSomething
+
+--version
