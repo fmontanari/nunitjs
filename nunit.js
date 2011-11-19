@@ -12,7 +12,6 @@ var AssertionError = require('assert').AssertionError;
 var currentContext = { disposed : true };
 
 /********************** main ****************************/
-
 exports.run = function (args) {
 	var argumentParser = new ArgumentParser();
 	var params = argumentParser.parse(args);
@@ -124,12 +123,6 @@ function Runner(reporter) {
 	var totalResult = new Result();
 
 	this.run = function (fixtures, selectedTest) {
-
-//		console.log("***** fixtures *****");
-//		fixtures.forEach(function(fixture) {
-//			console.log("fixture: " + fixture);
-//		});
-//		console.log("***** ******** *****");
 
 		runNextFixture(fixtures, selectedTest);
 	};
@@ -410,22 +403,15 @@ function Context() {
 	var self = this;
 	this.disposed = false;
 	this.timeoutId;
-	this.timeoutMs;
-	Object.defineProperty(this, "timeout", {
-		get : function () {
-			return this.timeoutMs;
-		},
-		set : function (value) {
-			this.timeoutMs = value;
+	
+	this.setTimeout = function(timeout){
 
-			clearTimeout(this.timeoutId);
+		clearTimeout(this.timeoutId);
 
-			this.timeoutId = setTimeout(function(){
-				self.fail(new Error("timeout " + value + " ms."));
-			}, value);
-		}
-
-	});
+		this.timeoutId = setTimeout(function(){
+			self.fail(new Error("timeout " + timeout + " ms."));
+		}, timeout);
+	}
 
 	this.startDelegate = function(){};
 	this.onStart = function(delegate){
@@ -443,7 +429,7 @@ function Context() {
 	};
 
 	this.start = function () {
-		this.timeout = 1000;
+		this.setTimeout(1000);
 
 		try {
 			this.startDelegate();
