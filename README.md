@@ -76,8 +76,41 @@ Asynchronous Testing
 --------------------
 
 NUnitJS is designed to help you testing asynchronous code.
+All context (test, setUp, tearDown, fixtureSetUp and fixtureTearDown) can explicity complete with done() method on context object:
 
+Example 1: complete on same tick
 
+    exports.testSomething = function(context){
+        
+        context.done();
+    };
+
+Example 2: complete on different tick
+
+    exports.testSomething = function(context){
+      
+        setTimeout(function(){
+        
+            context.done();
+        
+        }, 500);
+    };
+    
+Timeout
+--------------------
+
+if the done() method was never called, test failed on default timeout, 1000ms. You can change timeout if your test spends much time.
+
+    exports.testSomething = function(context){
+    
+        context.setTimeout(2000);
+      
+        setTimeout(function(){
+        
+            context.done();
+        
+        }, 1500);
+    };
 
 setUp and tearDown
 --------------------------
