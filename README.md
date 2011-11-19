@@ -136,7 +136,7 @@ NUnitJS allows you to define a `setUp` function, which is run before each test, 
 fixtureSetUp and fixtureTearDown
 --------------------------
 
-NUnitJS allows you to define a `fixtureSetUp` function, which is run before each fixture, and a `fixtureTearDown` function, which is run after each fixture calls all tests:
+NUnitJS allows you to define a `fixtureSetUp` function, which is run before each fixture, and a `fixtureTearDown` function, which is run after each fixture completed.
     
     exports.fixtureSetUp = function (fixtureSetUp) {
         this.foo = 'bar';
