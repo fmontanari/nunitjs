@@ -174,4 +174,4 @@ Donations
 The Author invests a time and effort to make NUnitJS a useful tool. In addition, we have expenses. We have to purchase domain names and arrange for web site hosting.
 Making a financial contribution is one way in which you can help him ensure that NUnitJS continues to develop.
 
-[Donate with PayPal](https://github.com/orlandov)
+[Donate with PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CW759SV2EXKYW)
