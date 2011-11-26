@@ -1,4 +1,4 @@
-exports.version = 1.0;
+exports.version = 1.1;
 
 /**
  * Author: Fabio Montanari
@@ -24,7 +24,7 @@ exports.run = function (args) {
 
 	process.on('uncaughtException', function (error) {
 		if (currentContext.disposed){
-			reporter.testDone("uncaughtException", error);
+			reporter.contextDone("uncaughtException", error);
 			return;
 		}
 
@@ -39,15 +39,20 @@ exports.run = function (args) {
 	var fixtures = fixtureFinder.find(paths);
 
 	var selectedTest = params["--test"];
+	
 	var delay = params["--delay"];
-	if (delay){
-		setTimeout(function(){
-			runner.run(fixtures, selectedTest);
-		}, delay);
-		return;
-	}
 
-	runner.run(fixtures, selectedTest);
+	if (!delay)
+		delay = 0;
+
+	setTimeout(function(){
+
+		runner.run(fixtures, selectedTest, function(totalResult){
+			process.exit(totalResult.failed);
+		});
+
+	}, delay);
+
 };
 
 /********************** argument parser ****************************/
@@ -122,15 +127,61 @@ function Runner(reporter) {
 
 	var totalResult = new Result();
 
-	this.run = function (fixtures, selectedTest) {
+	this.run = function (fixtures, selectedTest, done) {
 
-		runNextFixture(fixtures, selectedTest);
+		var complete = function(){
+			reporter.done(totalResult);
+			done(totalResult);
+		};
+
+		runGlobalSetUp(complete, function(){
+			runNextFixture(fixtures, selectedTest, function(){
+				runGlobalTearDown(complete, function(){
+					complete();
+				});
+			});
+		});
 	};
 
-	var runNextFixture = function (fixtures, selectedTest){
+	var runGlobalSetUp = function(done, callback){
+
+		var globalModule;
+		try{
+			globalModule = require("./nunit_global");
+		}catch(error){
+			callback();
+			return;
+		}
+
+		if (!globalModule.globalSetUp){
+			callback();
+			return;
+		}
+
+		var context = new Context();
+		currentContext = context;
+
+		context.onStart(function(){
+			globalModule.globalSetUp(context);
+		});
+
+		context.onPassed(function(){
+			callback();
+		});
+
+		context.onFailed(function(error){
+			totalResult.failed++;
+			reporter.contextDone("globalSetUp", error);
+			done();
+		});
+
+		context.start();
+	};
+
+	var runNextFixture = function (fixtures, selectedTest, done){
 
 		if (fixtures.length == 0){
-			complete();
+			done();
 			return;
 		}
 
@@ -140,13 +191,43 @@ function Runner(reporter) {
 
 		fixtureRunner.run(function(result){
 			totalResult.addResult(result);
-			runNextFixture(fixtures, selectedTest);
+			runNextFixture(fixtures, selectedTest, done);
 		});
 	};
 
-	var complete = function(){
-		reporter.done(totalResult);
-		process.exit(totalResult.failed);
+	var runGlobalTearDown = function(done, callback){
+
+		var globalModule;
+		try{
+			globalModule = require("./nunit_global");
+		}catch(error){
+			callback();
+			return;
+		}
+
+		if (!globalModule.globalTearDown){
+			callback();
+			return;
+		}
+
+		var context = new Context();
+		currentContext = context;
+
+		context.onStart(function(){
+			globalModule.globalTearDown(context);
+		});
+
+		context.onPassed(function(){
+			callback();
+		});
+
+		context.onFailed(function(error){
+			totalResult.failed++;
+			reporter.contextDone("globalTearDown", error);
+			done();
+		});
+
+		context.start();
 	};
 
 }
@@ -200,7 +281,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 		});
 
 		context.onFailed(function(error){
-			reporter.testDone("fixtureSetUp", error);
+			reporter.contextDone("fixtureSetUp", error);
 			result.failed += testNames.length;
 			result.total += testNames.length;
 			fixtureDone();
@@ -251,7 +332,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 		});
 
 		context.onFailed(function(error){
-			reporter.testDone("fixtureTearDown", error);
+			reporter.contextDone("fixtureTearDown", error);
 			result.failed += testNames.length;
 			result.total += testNames.length;
 			fixtureDone();
@@ -341,7 +422,7 @@ function TestRunner(reporter, module, testName) {
 		});
 
 		context.onFailed(function(error){
-			reporter.testDone(testName + " ---> setUp", error);
+			reporter.contextDone(testName + " ---> setUp", error);
 			done(false);
 		});
 
@@ -358,12 +439,12 @@ function TestRunner(reporter, module, testName) {
 		});
 
 		context.onPassed(function(){
-			reporter.testDone(testName);
+			reporter.contextDone(testName);
 			callback();
 		});
 
 		context.onFailed(function(error){
-			reporter.testDone(testName, error);
+			reporter.contextDone(testName, error);
 			done(false);
 		});
 
@@ -389,7 +470,7 @@ function TestRunner(reporter, module, testName) {
 		});
 
 		context.onFailed(function(error){
-			reporter.testDone(testName + " ---> tearDown", error);
+			reporter.contextDone(testName + " ---> tearDown", error);
 			done(false);
 		});
 
@@ -459,7 +540,10 @@ function Context() {
 function Reporter(verbose) {
 
 	this.version = function(){
-		console.log('\n' + "NUnitJS version: " + exports.version.toFixed(1));
+		console.log('\n');
+		console.log("## NUnitJS version: " + exports.version.toFixed(1));
+		console.log("## Author: Fabio Montanari");
+		console.log("## Web: nunitjs.org");
 	}
 
 	this.fixtureStart = function (fixture) {
@@ -470,16 +554,16 @@ function Reporter(verbose) {
 		
 	};
 
-	this.testDone = function (name, error) {
+	this.contextDone = function (name, error) {
 		if (!error) {
 
 			if (verbose !== undefined){
-				console.log("\n>> Test '" + name + "' Passed.");
+				console.log("\n>>>>> '" + name + "' Passed.");
 			}
 		}
 		else {
 
-			console.log("\n>> Test '" + name + "' failed.");
+			console.log("\n>>>>> '" + name + "' failed.");
 
 			if (error instanceof AssertionError){
 				console.log("    message: " + error.message);
