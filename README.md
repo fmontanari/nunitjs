@@ -152,3 +152,26 @@ NUnitJS allows you to define a `fixtureSetUp` function, which is run before each
         assert.equals(this.foo, 'bar');
         test.done();
     };
+    
+
+NUnitJS plugin for WebStorm
+--------------------------
+
+NUnitJS plugin provides easy integration with WebStorm IDE
+
+* Simple to use.
+* Easy access actions in toolbar, main menu and context menu.
+* Runs and debug all tests.
+* Runs and debug current fixture.
+* Runs and debug fixture selected.
+* Runs and debug multiple selection folders.
+* Runs and debug current test.
+
+http://www.nunitjs.org/nunitjsplugin
+
+Donations
+--------------------------
+The Author invests a time and effort to make NUnitJS a useful tool. In addition, we have expenses. We have to purchase domain names and arrange for web site hosting.
+Making a financial contribution is one way in which you can help him ensure that NUnitJS continues to develop.
+
+[Donate with PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CW759SV2EXKYW)
