@@ -1,4 +1,4 @@
-exports.version = 1.1;
+exports.version = 1.2;
 
 /**
  * Author: Fabio Montanari
@@ -7,6 +7,7 @@ exports.version = 1.1;
 
 process.chdir(__dirname);
 var fs = require("fs");
+var path = require("path");
 var AssertionError = require('assert').AssertionError;
 
 var currentContext = { disposed : true };
@@ -124,7 +125,7 @@ function FixtureFinder() {
 
 /********************** runner ****************************/
 function Runner(reporter) {
-
+	var pathGlobal = "./nunit_global";
 	var totalResult = new Result();
 
 	this.run = function (fixtures, selectedTest, done) {
@@ -147,7 +148,7 @@ function Runner(reporter) {
 
 		var globalModule;
 		try{
-			globalModule = require("./nunit_global");
+			globalModule = require(pathGlobal);
 		}catch(error){
 			callback();
 			return;
@@ -199,7 +200,7 @@ function Runner(reporter) {
 
 		var globalModule;
 		try{
-			globalModule = require("./nunit_global");
+			globalModule = require(pathGlobal);
 		}catch(error){
 			callback();
 			return;
@@ -343,11 +344,8 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 
 	function buildModuleName(fixture) {
 		var strModule = fixture;
-		if (strEndsWith(fixture, ".js")) {
-			strModule = fixture.substr(0, fixture.length - 3);
-		}
-
-		if (!strStartsWith(fixture, "./") && !strStartsWith(fixture, "/")) {
+		strModule = path.relative(__dirname, strModule);
+		if (!strStartsWith(strModule, "..")) {
 			strModule = "./" + strModule;
 		}
 
