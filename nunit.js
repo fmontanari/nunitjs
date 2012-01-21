@@ -1,4 +1,4 @@
-exports.version = 1.2;
+exports.version = 1.3;
 
 /**
  * Author: Fabio Montanari
@@ -14,592 +14,603 @@ var currentContext = { disposed : true };
 
 /********************** main ****************************/
 exports.run = function (args) {
-	var argumentParser = new ArgumentParser();
-	var params = argumentParser.parse(args);
+    var argumentParser = new ArgumentParser();
+    var params = argumentParser.parse(args);
 
-	var reporter = new Reporter(params["--verbose"]);
-	reporter.version();
+    var reporter = new Reporter(params["--verbose"]);
+    reporter.version();
 
-	if (params["--version"] !== undefined)
-		return;
+    if (params["--version"] !== undefined)
+        return;
 
-	process.on('uncaughtException', function (error) {
-		if (currentContext.disposed){
-			reporter.contextDone("uncaughtException", error);
-			return;
-		}
+    process.on('uncaughtException', function (error) {
+        if (currentContext.disposed){
+            reporter.contextDone("uncaughtException", error);
+            return;
+        }
 
-		currentContext.fail(error);
-	});
+        currentContext.fail(error);
+    });
 
-	var runner = new Runner(reporter);
+    var runner = new Runner(reporter);
 
-	var paths = extractPaths(params["--path"]);
+    var paths = extractPaths(params["--path"]);
 
-	var fixtureFinder = new FixtureFinder();
-	var fixtures = fixtureFinder.find(paths);
+    var fixtureFinder = new FixtureFinder();
+    var fixtures = fixtureFinder.find(paths);
 
-	var selectedTest = params["--test"];
-	
-	var delay = params["--delay"];
+    var selectedTest = params["--test"];
 
-	if (!delay)
-		delay = 0;
+    var delay = params["--delay"];
 
-	setTimeout(function(){
+    if (!delay)
+        delay = 0;
 
-		runner.run(fixtures, selectedTest, function(totalResult){
-			process.exit(totalResult.failed);
-		});
+    var exitCode = -1;
 
-	}, delay);
+    setTimeout(function(){
 
+        runner.run(fixtures, selectedTest, function(totalResult){
+            exitCode = totalResult.failed;
+        });
+
+    }, delay);
+
+    process.on('exit', function () {
+        process.exit(exitCode);
+    });
 };
 
 /********************** argument parser ****************************/
 function ArgumentParser() {
-	this.parse = function (args) {
-		var params = {};
+    this.parse = function (args) {
+        var params = {};
 
-		args.forEach(function(arg, index) {
-			parseArg(arg, params);
-		});
+        args.forEach(function(arg, index) {
+            parseArg(arg, params);
+        });
 
-		return params;
-	};
+        return params;
+    };
 
-	function parseArg(arg, params) {
+    function parseArg(arg, params) {
 
-		var keyValues = arg.split("=");
-		params[keyValues[0]] = keyValues[1] ? keyValues[1] : null;
-	}
+        var keyValues = arg.split("=");
+        params[keyValues[0]] = keyValues[1] ? keyValues[1] : null;
+    }
 }
 
 /********************** extract paths ****************************/
 function extractPaths(pathParam) {
-	if (!pathParam)
-	return ["."];
+    if (!pathParam)
+        return ["."];
 
-	return pathParam.split(",");
+    return pathParam.split(",");
 }
 
 /********************** fixture finder ****************************/
 function FixtureFinder() {
 
-	this.find = function(paths) {
-		var fixtures = [];
+    this.find = function(paths) {
+        var fixtures = [];
 
-		paths.forEach(function(path){
-			findFixture(fixtures, path);
-		});
+        paths.forEach(function(path){
+            findFixture(fixtures, path);
+        });
 
-		return fixtures;
-	};
+        return fixtures;
+    };
 
-	function findFixture(fixtures, path) {
+    function findFixture(fixtures, path) {
 
-		var stats = fs.statSync(path);
+        var stats = fs.statSync(path);
 
-		if (stats.isDirectory()) {
-			findFixtureInDir(fixtures, path);
-			return;
-		}
+        if (stats.isDirectory()) {
+            findFixtureInDir(fixtures, path);
+            return;
+        }
 
-		if (!strEndsWith(path, "_fixture.js")) {
-			return;
-		}
+        if (!strEndsWith(path, "_fixture.js")) {
+            return;
+        }
 
-		fixtures.push(path);
-	}
+        fixtures.push(path);
+    }
 
-	function findFixtureInDir(fixtures, path) {
-		var items = fs.readdirSync(path);
+    function findFixtureInDir(fixtures, path) {
+        var items = fs.readdirSync(path);
 
-		for (var i = 0; i < items.length; i++) {
-			var item = items[i];
-			var itemPath = path + "/" + item;
-			findFixture(fixtures, itemPath);
-		}
-	}
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var itemPath = path + "/" + item;
+            findFixture(fixtures, itemPath);
+        }
+    }
 }
 
 /********************** runner ****************************/
 function Runner(reporter) {
-	var pathGlobal = "./nunit_global";
-	var totalResult = new Result();
+    var pathGlobal = "./nunit_global";
+    var totalResult = new Result();
 
-	this.run = function (fixtures, selectedTest, done) {
+    this.run = function (fixtures, selectedTest, done) {
 
-		var complete = function(){
-			reporter.done(totalResult);
-			done(totalResult);
-		};
+        var complete = function(){
+            reporter.done(totalResult);
+            done(totalResult);
+        };
 
-		runGlobalSetUp(complete, function(){
-			runNextFixture(fixtures, selectedTest, function(){
-				runGlobalTearDown(complete, function(){
-					complete();
-				});
-			});
-		});
-	};
+        runGlobalSetUp(complete, function(){
+            runNextFixture(fixtures, selectedTest, function(){
+                runGlobalTearDown(complete, function(){
+                    complete();
+                });
+            });
+        });
+    };
 
-	var runGlobalSetUp = function(done, callback){
+    var runGlobalSetUp = function(done, callback){
 
-		var globalModule;
-		try{
-			globalModule = require(pathGlobal);
-		}catch(error){
-			callback();
-			return;
-		}
+        var globalModule;
+        try{
+            globalModule = require(pathGlobal);
+        }catch(error){
+            callback();
+            return;
+        }
 
-		if (!globalModule.globalSetUp){
-			callback();
-			return;
-		}
+        if (!globalModule.globalSetUp){
+            callback();
+            return;
+        }
 
-		var context = new Context();
-		currentContext = context;
+        var context = new Context();
+        currentContext = context;
 
-		context.onStart(function(){
-			globalModule.globalSetUp(context);
-		});
+        context.onStart(function(){
+            globalModule.globalSetUp(context);
+        });
 
-		context.onPassed(function(){
-			callback();
-		});
+        context.onPassed(function(){
+            callback();
+        });
 
-		context.onFailed(function(error){
-			totalResult.failed++;
-			reporter.contextDone("globalSetUp", error);
-			done();
-		});
+        context.onFailed(function(error){
+            totalResult.failed++;
+            reporter.contextDone("globalSetUp", error);
+            done();
+        });
 
-		context.start();
-	};
+        context.start();
+    };
 
-	var runNextFixture = function (fixtures, selectedTest, done){
+    var runNextFixture = function (fixtures, selectedTest, done){
 
-		if (fixtures.length == 0){
-			done();
-			return;
-		}
+        if (fixtures.length == 0){
+            done();
+            return;
+        }
 
-		var fixture = fixtures.shift();
+        var fixture = fixtures.shift();
 
-		var fixtureRunner = new FixtureRunner(reporter, fixture, selectedTest);
+        var fixtureRunner = new FixtureRunner(reporter, fixture, selectedTest);
 
-		fixtureRunner.run(function(result){
-			totalResult.addResult(result);
-			runNextFixture(fixtures, selectedTest, done);
-		});
-	};
+        fixtureRunner.run(function(result){
+            totalResult.addResult(result);
+            runNextFixture(fixtures, selectedTest, done);
+        });
+    };
 
-	var runGlobalTearDown = function(done, callback){
+    var runGlobalTearDown = function(done, callback){
 
-		var globalModule;
-		try{
-			globalModule = require(pathGlobal);
-		}catch(error){
-			callback();
-			return;
-		}
+        var globalModule;
+        try{
+            globalModule = require(pathGlobal);
+        }catch(error){
+            callback();
+            return;
+        }
 
-		if (!globalModule.globalTearDown){
-			callback();
-			return;
-		}
+        if (!globalModule.globalTearDown){
+            callback();
+            return;
+        }
 
-		var context = new Context();
-		currentContext = context;
+        var context = new Context();
+        currentContext = context;
 
-		context.onStart(function(){
-			globalModule.globalTearDown(context);
-		});
+        context.onStart(function(){
+            globalModule.globalTearDown(context);
+        });
 
-		context.onPassed(function(){
-			callback();
-		});
+        context.onPassed(function(){
+            callback();
+        });
 
-		context.onFailed(function(error){
-			totalResult.failed++;
-			reporter.contextDone("globalTearDown", error);
-			done();
-		});
+        context.onFailed(function(error){
+            totalResult.failed++;
+            reporter.contextDone("globalTearDown", error);
+            done();
+        });
 
-		context.start();
-	};
+        context.start();
+    };
 
 }
 
 /********************** Fixture Runner ****************************/
 function FixtureRunner(reporter, fixture, selectedTest) {
 
-	var result = new Result();
-	var startDate;
-		
-	this.run = function(done) {
+    var result = new Result();
+    var startDate;
 
-		startDate = new Date();
-		reporter.fixtureStart(fixture);
+    this.run = function(done) {
 
-		var fixtureDone = function(){
-			result.duration = new Date() - startDate;
-			reporter.fixtureDone(fixture, result);
-			done(result);
-		};
+        startDate = new Date();
+        reporter.fixtureStart(fixture);
 
-		var testModuleName = buildModuleName(fixture);
-		var testModule = require(testModuleName);
-		var testNames = getTestToExecute(testModule, selectedTest);
+        var fixtureDone = function(){
+            result.duration = new Date() - startDate;
+            reporter.fixtureDone(fixture, result);
+            done(result);
+        };
 
-		runFixtureSetUp(testNames, testModule, fixtureDone, function(){
-			runNextTest(testNames, testModule, function(){
-				runFixtureTearDown(testNames, testModule, fixtureDone, function(){
-					fixtureDone();
-				});
-			});
-		});
-	};
+        var testModuleName = buildModuleName(fixture);
+        var testModule = require(testModuleName);
+        var testNames = getTestToExecute(testModule, selectedTest);
 
-	var runFixtureSetUp = function(testNames, testModule, fixtureDone, callback){
+        runFixtureSetUp(testNames, testModule, fixtureDone, function(){
+            runNextTest(testNames, testModule, function(){
+                runFixtureTearDown(testNames, testModule, fixtureDone, function(){
+                    fixtureDone();
+                });
+            });
+        });
+    };
 
-		if (!testModule.fixtureSetUp){
-			callback();
-			return;
-		}
+    var runFixtureSetUp = function(testNames, testModule, fixtureDone, callback){
 
-		var context = new Context();
-		currentContext = context;
+        if (!testModule.fixtureSetUp){
+            callback();
+            return;
+        }
 
-		context.onStart(function(){
-			testModule.fixtureSetUp(context);
-		});
+        var context = new Context();
+        currentContext = context;
 
-		context.onPassed(function(){
-			callback();
-		});
+        context.onStart(function(){
+            testModule.fixtureSetUp(context);
+        });
 
-		context.onFailed(function(error){
-			reporter.contextDone("fixtureSetUp", error);
-			result.failed += testNames.length;
-			result.total += testNames.length;
-			fixtureDone();
-		});
+        context.onPassed(function(){
+            callback();
+        });
 
-		context.start();
-	};
+        context.onFailed(function(error){
+            reporter.contextDone("fixtureSetUp", error);
+            result.failed += testNames.length;
+            result.total += testNames.length;
+            fixtureDone();
+        });
 
-	var runNextTest = function(testNames, testModule, callback){
+        context.start();
+    };
 
-		if (testNames.length == 0){
-			callback();
-			return;
-		}
+    var runNextTest = function(testNames, testModule, callback){
 
-		result.total++;
+        if (testNames.length == 0){
+            callback();
+            return;
+        }
 
-		var testName = testNames.shift();
+        result.total++;
 
-		var testRunner = new TestRunner(reporter, testModule, testName);
-		testRunner.run(function(success){
+        var testName = testNames.shift();
 
-			if (success)
-				result.passed++;
-			else
-				result.failed++;
+        var testRunner = new TestRunner(reporter, testModule, testName);
+        testRunner.run(function(success){
 
-			runNextTest(testNames, testModule, callback);
-		});
-	};
+            if (success)
+                result.passed++;
+            else
+                result.failed++;
 
-	var runFixtureTearDown = function(testNames, testModule, fixtureDone, callback){
+            runNextTest(testNames, testModule, callback);
+        });
+    };
 
-		if (!testModule.fixtureTearDown){
-			callback();
-			return;
-		}
+    var runFixtureTearDown = function(testNames, testModule, fixtureDone, callback){
 
-		var context = new Context();
-		currentContext = context;
+        if (!testModule.fixtureTearDown){
+            callback();
+            return;
+        }
 
-		context.onStart(function(){
-			testModule.fixtureTearDown(context);
-		});
+        var context = new Context();
+        currentContext = context;
 
-		context.onPassed(function(){
-			callback();
-		});
+        context.onStart(function(){
+            testModule.fixtureTearDown(context);
+        });
 
-		context.onFailed(function(error){
-			reporter.contextDone("fixtureTearDown", error);
-			result.failed += testNames.length;
-			result.total += testNames.length;
-			fixtureDone();
-		});
+        context.onPassed(function(){
+            callback();
+        });
 
-		context.start();
-	};
+        context.onFailed(function(error){
+            reporter.contextDone("fixtureTearDown", error);
+            result.failed += testNames.length;
+            result.total += testNames.length;
+            fixtureDone();
+        });
 
-	function buildModuleName(fixture) {
-		var strModule = fixture;
-		strModule = path.relative(__dirname, strModule);
-		if (!strStartsWith(strModule, "..")) {
-			strModule = "./" + strModule;
-		}
+        context.start();
+    };
 
-		return strModule;
-	}
+    function buildModuleName(fixture) {
+        var strModule = fixture;
+        strModule = path.relative(__dirname, strModule);
+        if (!strStartsWith(strModule, "..")) {
+            strModule = "./" + strModule;
+        }
 
-	function getTestToExecute(module, selectedTest){
-		var testNames = [];
+        return strModule;
+    }
 
-		for (var key in module){
-			if (!strStartsWith(key, "test")){
-				continue;
-			}
+    function getTestToExecute(module, selectedTest){
+        var testNames = [];
 
-			if (selectedTest && key != selectedTest){
-				continue;
-			}
+        for (var key in module){
+            if (!strStartsWith(key, "test")){
+                continue;
+            }
 
-			testNames.push(key);
-		}
+            if (selectedTest && key != selectedTest){
+                continue;
+            }
 
-		return testNames;
-	}
+            testNames.push(key);
+        }
+
+        return testNames;
+    }
 }
 
 /********************** Fixture Result ****************************/
 function Result(){
-	this.total = 0;
-	this.passed = 0;
-	this.failed = 0;
-	this.duration = 0;
+    this.total = 0;
+    this.passed = 0;
+    this.failed = 0;
+    this.duration = 0;
 
-	this.addResult = function (result) {
-		this.total += result.total;
-		this.passed += result.passed;
-		this.failed += result.failed;
-		this.duration += result.duration;
-	};
+    this.addResult = function (result) {
+        this.total += result.total;
+        this.passed += result.passed;
+        this.failed += result.failed;
+        this.duration += result.duration;
+    };
 }
 
 /********************** Test Runner ****************************/
 function TestRunner(reporter, module, testName) {
 
-	this.run = function(done){
+    this.run = function(done){
 
-		setUp(done, function(){
-			runTest(done, function(){
-				tearDown(done, function(){
-					done(true);
-				});
-			})
-		});
+        setUp(done, function(){
+            runTest(done, function(){
+                tearDown(done, function(){
+                    done(true);
+                });
+            })
+        });
 
-	};
+    };
 
-	function setUp(done, callback){
+    function setUp(done, callback){
 
-		if (!module.setUp){
-			callback();
-			return;
-		}
+        if (!module.setUp){
+            callback();
+            return;
+        }
 
-		var context = new Context();
-		currentContext = context;
-		
-		context.onStart(function(){
-			module.setUp(context);
-		});
+        var context = new Context();
+        currentContext = context;
 
-		context.onPassed(function(){
-			callback();
-		});
+        context.onStart(function(){
+            module.setUp(context);
+        });
 
-		context.onFailed(function(error){
-			reporter.contextDone(testName + " ---> setUp", error);
-			done(false);
-		});
+        context.onPassed(function(){
+            callback();
+        });
 
-		context.start();
-	}
+        context.onFailed(function(error){
+            reporter.contextDone(testName + " ---> setUp", error);
+            done(false);
+        });
 
-	function runTest(done, callback){
+        context.start();
+    }
 
-		var context = new Context();
-		currentContext = context;
-		
-		context.onStart(function(){
-			module[testName](context);
-		});
+    function runTest(done, callback){
 
-		context.onPassed(function(){
-			reporter.contextDone(testName);
-			callback();
-		});
+        var context = new Context();
+        currentContext = context;
 
-		context.onFailed(function(error){
-			reporter.contextDone(testName, error);
-			done(false);
-		});
+        context.onStart(function(){
+            module[testName](context);
+        });
 
-		context.start();
-	}
+        context.onPassed(function(){
+            reporter.contextDone(testName);
+            callback();
+        });
 
-	function tearDown(done, callback){
+        context.onFailed(function(error){
+            reporter.contextDone(testName, error);
+            done(false);
+        });
 
-		if (!module.tearDown){
-			callback();
-			return;
-		}
+        context.start();
+    }
 
-		var context = new Context();
-		currentContext = context;
-		
-		context.onStart(function(){
-			module.tearDown(context);
-		});
+    function tearDown(done, callback){
 
-		context.onPassed(function(){
-			callback();
-		});
+        if (!module.tearDown){
+            callback();
+            return;
+        }
 
-		context.onFailed(function(error){
-			reporter.contextDone(testName + " ---> tearDown", error);
-			done(false);
-		});
+        var context = new Context();
+        currentContext = context;
 
-		context.start();
-	}
+        context.onStart(function(){
+            module.tearDown(context);
+        });
+
+        context.onPassed(function(){
+            callback();
+        });
+
+        context.onFailed(function(error){
+            reporter.contextDone(testName + " ---> tearDown", error);
+            done(false);
+        });
+
+        context.start();
+    }
 }
 
 /********************** Context ****************************/
 function Context() {
 
-	var self = this;
-	this.disposed = false;
-	this.timeoutId;
-	
-	this.setTimeout = function(timeout){
+    var self = this;
+    this.disposed = false;
+    this.timeoutId;
 
-		clearTimeout(this.timeoutId);
+    this.setTimeout = function(timeout){
 
-		this.timeoutId = setTimeout(function(){
-			self.fail(new Error("timeout " + timeout + " ms."));
-		}, timeout);
-	}
+        clearTimeout(this.timeoutId);
 
-	this.startDelegate = function(){};
-	this.onStart = function(delegate){
-		this.startDelegate = delegate;
-	};
+        this.timeoutId = setTimeout(function(){
+            self.fail(new Error("timeout " + timeout + " ms."));
+        }, timeout);
+    }
 
-	this.passedDelegate = function(){};
-	this.onPassed = function(delegate){
-		this.passedDelegate = delegate;
-	};
+    this.startDelegate = function(){};
+    this.onStart = function(delegate){
+        this.startDelegate = delegate;
+    };
 
-	this.failedDelegate = function(){};
-	this.onFailed = function(delegate){
-		this.failedDelegate = delegate;
-	};
+    this.passedDelegate = function(){};
+    this.onPassed = function(delegate){
+        this.passedDelegate = delegate;
+    };
 
-	this.start = function () {
-		this.setTimeout(1000);
+    this.failedDelegate = function(){};
+    this.onFailed = function(delegate){
+        this.failedDelegate = delegate;
+    };
 
-		try {
-			this.startDelegate();
-		} catch(error) {
-			this.fail(error);
-		}
-	};
+    this.start = function () {
+        this.setTimeout(1000);
 
-	this.done = function () {
-		this.dispose();
-		this.passedDelegate();
-	};
+        try {
+            this.startDelegate();
+        } catch(error) {
+            this.fail(error);
+        }
+    };
 
-	this.fail = function (error) {
-		this.dispose();
-		this.failedDelegate(error);
-	};
+    this.done = function () {
+        if (this.disposed)
+            return;
 
-	this.dispose = function(){
-		clearTimeout(this.timeoutId);
-		this.disposed = true;
-	};
-	
+        this.dispose();
+        this.passedDelegate();
+    };
+
+    this.fail = function (error) {
+        if (this.disposed)
+            return;
+
+        this.dispose();
+        this.failedDelegate(error);
+    };
+
+    this.dispose = function(){
+        clearTimeout(this.timeoutId);
+        this.disposed = true;
+    };
+
 }
 
 /********************** reporter ****************************/
 function Reporter(verbose) {
 
-	this.version = function(){
-		console.log('\n');
-		console.log("## NUnitJS version: " + exports.version.toFixed(1));
-		console.log("## Author: Fabio Montanari");
-		console.log("## Web: nunitjs.org");
-	}
+    this.version = function(){
+        console.log('\n');
+        console.log("## NUnitJS version: " + exports.version.toFixed(1));
+        console.log("## Author: Fabio Montanari");
+        console.log("## Web: nunitjs.org");
+    }
 
-	this.fixtureStart = function (fixture) {
+    this.fixtureStart = function (fixture) {
 
-		console.log('\n\n' + "------ Fixture start --------------------");
-		console.log(fixture);
-		console.log("-----------------------------------------" + '\n\n');
-		
-	};
+        console.log('\n\n' + "------ Fixture start --------------------");
+        console.log(fixture);
+        console.log("-----------------------------------------" + '\n\n');
 
-	this.contextDone = function (name, error) {
-		if (!error) {
+    };
 
-			if (verbose !== undefined){
-				console.log("\n>>>>> '" + name + "' Passed.");
-			}
-		}
-		else {
+    this.contextDone = function (name, error) {
+        if (!error) {
 
-			console.log("\n>>>>> '" + name + "' failed.");
+            if (verbose !== undefined){
+                console.log("\n>>>>> '" + name + "' Passed.");
+            }
+        }
+        else {
 
-			if (error instanceof AssertionError){
-				console.log("    message: " + error.message);
-				console.log("    actual: " + error.actual);
-				console.log("    expected: " + error.expected);
-				console.log("    operator: " + error.operator);
-			}
+            console.log("\n>>>>> '" + name + "' failed.");
 
-			if (error.stack)
-				console.log("    " + error.stack);
-			else
-				console.log("    " + error);
-		}
-	};
+            if (error instanceof AssertionError){
+                console.log("    message: " + error.message);
+                console.log("    actual: " + error.actual);
+                console.log("    expected: " + error.expected);
+                console.log("    operator: " + error.operator);
+            }
 
-	this.fixtureDone = function (fixture, result) {
+            if (error.stack)
+                console.log("    " + error.stack);
+            else
+                console.log("    " + error);
+        }
+    };
 
-		console.log('\n\n' + "------ Fixture end ----------------------");
-		console.log(result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.');
-		console.log("-----------------------------------------");
-	};
+    this.fixtureDone = function (fixture, result) {
 
-	this.done = function (result) {
+        console.log('\n\n' + "------ Fixture end ----------------------");
+        console.log(result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.');
+        console.log("-----------------------------------------");
+    };
 
-		console.log('\n\n' + '========== Total: ' + result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.  ==========\n\n');
-	};
+    this.done = function (result) {
+
+        console.log('\n\n' + '========== Total: ' + result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.  ==========\n\n');
+    };
 }
 
 /****************** utils *********************/
 function strEndsWith(str, strEnd) {
-	return (str.match(strEnd + "$") == strEnd);
-};
+    return (str.match(strEnd + "$") == strEnd);
+}
 
 function strStartsWith(str, strStart) {
-	return (str.match("^" + strStart) == strStart);
-};
+    return (str.match("^" + strStart) == strStart);
+}
 
 /****************** entry point *********************/
 if (module == require.main) {
-	exports.run(process.argv);
+    exports.run(process.argv);
 }
