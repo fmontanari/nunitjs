@@ -167,7 +167,7 @@ NUnitJS plugin provides easy integration with WebStorm IDE
 * Runs and debug multiple selection folders.
 * Runs and debug current test.
 
-http://www.nunitjs.org/nunitjsplugin
+http://github.com/fmontanari/NUnitJSPlugin
 
 Donations
 --------------------------
