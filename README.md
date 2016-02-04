@@ -15,7 +15,7 @@ Usage
 -----
 
 Here is an example unit test fixture module:
-sample_fixture.js
+fixtures/sample_fixture.js
 
     var assert = require("assert");
 
@@ -31,7 +31,7 @@ sample_fixture.js
 
 Here the command line to run:
 
-    node nunit.js --path="sample_fixture.js"
+    node nunit.js --path="fixtures/sample_fixture.js"
 
 When run, this will output the following xml report:
 
@@ -45,7 +45,7 @@ actual: false
 expected: true
 operator: ==
 AssertionError: this assertion should fail
-    at Object.exports.testSomethingElse (/path/to/project/sample_fixture.js:9:12)
+    at Object.exports.testSomethingElse (/path/to/project/fixtures/sample_fixture.js:9:12)
     at Context.startDelegate (/path/to/project/nunit.js:501:29)
     at Context.start (/path/to/project/nunit.js:608:18)
     at runTest (/path/to/project/nunit.js:542:17)
