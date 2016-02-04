@@ -1,4 +1,4 @@
-exports.version = 1.3;
+exports.version = 1.4;
 
 /**
  * Author: Fabio Montanari
@@ -9,6 +9,10 @@ process.chdir(__dirname);
 var fs = require("fs");
 var path = require("path");
 var AssertionError = require('assert').AssertionError;
+var rimraf = require('rimraf');
+var js2xmlparser = require('js2xmlparser');
+
+var REPORT_PATH = "./reports";
 
 var currentContext = { disposed : true };
 
@@ -19,6 +23,20 @@ exports.run = function (args) {
 
     var reporter = new Reporter(params["--verbose"]);
     reporter.version();
+
+    if(params["--reportpath"] !== undefined){
+        REPORT_PATH = params["--reportpath"];
+    }
+    try {
+        rimraf.sync(REPORT_PATH);
+    }catch (error){
+        console.log("rimraf error " + error);
+    }
+    try{
+        fs.mkdirSync(REPORT_PATH);
+    }catch(error){
+        console.log("mkdirSync error " + error);
+    }
 
     if (params["--version"] !== undefined)
         return;
@@ -238,15 +256,31 @@ function Runner(reporter) {
 
 }
 
+
+
 /********************** Fixture Runner ****************************/
 function FixtureRunner(reporter, fixture, selectedTest) {
 
     var result = new Result();
     var startDate;
 
-    this.run = function(done) {
+    var name = path.basename(path.relative("",fixture).split('/').join('.'),".js");
 
+    this.testsuite = {
+
+        "@":{
+            "name":name
+        },
+        "testcase":[]
+
+    };
+
+    this.run = function(done) {
+        var self = this;
         startDate = new Date();
+
+        reporter.testsuite = this.testsuite;
+
         reporter.fixtureStart(fixture);
 
         var fixtureDone = function(){
@@ -260,7 +294,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
         var testNames = getTestToExecute(testModule, selectedTest);
 
         runFixtureSetUp(testNames, testModule, fixtureDone, function(){
-            runNextTest(testNames, testModule, function(){
+            runNextTest(testNames, testModule, self.testsuite, function(){
                 runFixtureTearDown(testNames, testModule, fixtureDone, function(){
                     fixtureDone();
                 });
@@ -277,6 +311,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 
         var context = new Context();
         currentContext = context;
+        context.result = result;
 
         context.onStart(function(){
             testModule.fixtureSetUp(context);
@@ -287,6 +322,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
         });
 
         context.onFailed(function(error){
+            console.log(error);
             reporter.contextDone("fixtureSetUp", error);
             result.failed += testNames.length;
             result.total += testNames.length;
@@ -296,7 +332,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
         context.start();
     };
 
-    var runNextTest = function(testNames, testModule, callback){
+    var runNextTest = function(testNames, testModule, testsuite, callback){
 
         if (testNames.length == 0){
             callback();
@@ -307,7 +343,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 
         var testName = testNames.shift();
 
-        var testRunner = new TestRunner(reporter, testModule, testName);
+        var testRunner = new TestRunner(reporter, testModule, testName, testsuite);
         testRunner.run(function(success){
 
             if (success)
@@ -315,7 +351,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
             else
                 result.failed++;
 
-            runNextTest(testNames, testModule, callback);
+            runNextTest(testNames, testModule, testsuite, callback);
         });
     };
 
@@ -392,16 +428,36 @@ function Result(){
 }
 
 /********************** Test Runner ****************************/
-function TestRunner(reporter, module, testName) {
+function TestRunner(reporter, module, testName, testsuite) {
+
+
+    this.testcase = {
+        "@":{
+            "name":testName,
+            "time":0
+        }
+    };
+    var self = this;
+    testsuite.testcase.push(this.testcase);
+    this.testsuite = testsuite;
+
+
+    this.duration = 0;
 
     this.run = function(done){
-
+        self.duration = new Date().getMilliseconds();
         setUp(done, function(){
-            runTest(done, function(){
+            runTest(self, done, function(){
                 tearDown(done, function(){
                     done(true);
                 });
-            })
+            },function(){
+                if(self.testsuite && self.testsuite.testcase !== undefined){
+                    self.durtation = new Date().getMilliseconds() - self.duration;
+                    self.testcase["@"].time = self.duration/1000.0;
+                }
+
+            });
         });
 
     };
@@ -414,6 +470,7 @@ function TestRunner(reporter, module, testName) {
         }
 
         var context = new Context();
+
         currentContext = context;
 
         context.onStart(function(){
@@ -432,10 +489,13 @@ function TestRunner(reporter, module, testName) {
         context.start();
     }
 
-    function runTest(done, callback){
+    function runTest(testRunner, done, callback, alwaysCallback){
 
         var context = new Context();
+        context.testcase = testRunner.testcase;
+
         currentContext = context;
+
 
         context.onStart(function(){
             module[testName](context);
@@ -444,10 +504,38 @@ function TestRunner(reporter, module, testName) {
         context.onPassed(function(){
             reporter.contextDone(testName);
             callback();
+            alwaysCallback();
         });
 
         context.onFailed(function(error){
+            var message = error.message;
+            var stack;
+
+            if (error instanceof AssertionError){
+                message ="AssertionError message: " + error.message;
+                message +=", actual: " + error.actual;
+                message +=", expected: " + error.expected;
+                message +=", operator: " + error.operator;
+                stack ="message: " + error.message;
+                stack +="\nactual: " + error.actual;
+                stack +="\nexpected: " + error.expected;
+                stack +="\noperator: " + error.operator;
+                stack +="\n";
+            }
+            if(error.stack){
+                stack += error.stack;
+            }
+
+
+            this.testcase.failure = {
+                "@":{
+                    "message" : message,
+                    "type" : error.name
+                },
+                "#":stack
+            };
             reporter.contextDone(testName, error);
+            alwaysCallback();
             done(false);
         });
 
@@ -486,6 +574,7 @@ function Context() {
 
     var self = this;
     this.disposed = false;
+    this.passed = undefined;
     this.timeoutId;
 
     this.setTimeout = function(timeout){
@@ -590,6 +679,17 @@ function Reporter(verbose) {
 
     this.fixtureDone = function (fixture, result) {
 
+        this.testsuite["@"].time = result.duration / 1000.0;
+        this.testsuite["@"].tests = result.total;
+        this.testsuite["@"].failures = result.failed;
+        var options = {useCDATA:true};
+        var report = js2xmlparser("testsuite",this.testsuite,options);
+        fs.writeFile(REPORT_PATH +"/TEST-"+ this.testsuite["@"].name + ".xml", report, function(err){
+            if(err){
+                return console.log(err);
+
+            }
+        });
         console.log('\n\n' + "------ Fixture end ----------------------");
         console.log(result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.');
         console.log("-----------------------------------------");
