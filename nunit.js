@@ -574,7 +574,6 @@ function Context() {
 
     var self = this;
     this.disposed = false;
-    this.passed = undefined;
     this.timeoutId;
 
     this.setTimeout = function(timeout){
