@@ -33,9 +33,32 @@ Here the command line to run:
 
     node nunit.js --path="sample_fixture.js"
 
-When run, this will output the following:
+When run, this will output the following xml report:
 
-  image
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fixtures.sample_fixture" time="0.006" tests="2" failures="1">
+    <testcase name="testSomething" time="0"/>
+    <testcase name="testSomethingElse" time="0.162">
+        <failure message="AssertionError message: this assertion should fail, actual: false, expected: true, operator: ==" type="AssertionError"><![CDATA[message: this assertion should fail
+actual: false
+expected: true
+operator: ==
+AssertionError: this assertion should fail
+    at Object.exports.testSomethingElse (/path/to/project/sample_fixture.js:9:12)
+    at Context.startDelegate (/path/to/project/nunit.js:501:29)
+    at Context.start (/path/to/project/nunit.js:608:18)
+    at runTest (/path/to/project/nunit.js:542:17)
+    at /path/to/project/nunit.js:450:13
+    at setUp (/path/to/project/nunit.js:468:13)
+    at TestRunner.run (/path/to/project/nunit.js:449:9)
+    at FixtureRunner.runNextTest (/path/to/project/nunit.js:347:20)
+    at /path/to/project/nunit.js:354:13
+    at /path/to/project/nunit.js:452:21]]></failure>
+    </testcase>
+</testsuite>
+
+```
 
 
 Command-line arguments
@@ -63,6 +86,12 @@ Test function name to execute alone.
 delay to start tests. Used for debug mode on waiting for debug attached.
 
     node nunit.js --delay=1000
+
+--reportpath=[path]
+
+Path where to generate reports. Defaults to reports.
+
+    node nunit.js --reportpath=reportfolder
 
 --verbose
 
