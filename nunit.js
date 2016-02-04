@@ -512,11 +512,6 @@ function TestRunner(reporter, module, testName, testsuite) {
             var stack;
 
             if (error instanceof AssertionError){
-                message ="AssertionError message: " + error.message;
-                message +=", actual: " + error.actual;
-                message +=", expected: " + error.expected;
-                message +=", operator: " + error.operator;
-                stack ="message: " + error.message;
                 stack +="\nactual: " + error.actual;
                 stack +="\nexpected: " + error.expected;
                 stack +="\noperator: " + error.operator;

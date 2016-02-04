@@ -40,8 +40,7 @@ When run, this will output the following xml report:
 <testsuite name="fixtures.sample_fixture" time="0.006" tests="2" failures="1">
     <testcase name="testSomething" time="0"/>
     <testcase name="testSomethingElse" time="0.162">
-        <failure message="AssertionError message: this assertion should fail, actual: false, expected: true, operator: ==" type="AssertionError"><![CDATA[message: this assertion should fail
-actual: false
+        <failure message="this assertion should fail" type="AssertionError"><![CDATA[actual: false
 expected: true
 operator: ==
 AssertionError: this assertion should fail
