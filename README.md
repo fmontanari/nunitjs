@@ -73,13 +73,13 @@ Multiple Path are allowed with comma separated.
     
     node nunit.js --path=folder1,folder2
     
-    node nunit.js --path=sample1_fixture.js,sample2_fixture.js
+    node nunit.js --path=fixtures/sample1_fixture.js,fixtures/sample2_fixture.js
 
 --test=[test name]
 
 Test function name to execute alone.
 
-    node nunit.js --path=sample_fixture.js --test=testSomething
+    node nunit.js --path=fixtures/sample_fixture.js --test=testSomething
 
 --delay=[Milliseconds]
 
