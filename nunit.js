@@ -509,10 +509,10 @@ function TestRunner(reporter, module, testName, testsuite) {
 
         context.onFailed(function(error){
             var message = error.message;
-            var stack;
+            var stack = "";
 
             if (error instanceof AssertionError){
-                stack +="\nactual: " + error.actual;
+                stack +="actual: " + error.actual;
                 stack +="\nexpected: " + error.expected;
                 stack +="\noperator: " + error.operator;
                 stack +="\n";
