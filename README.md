@@ -86,11 +86,17 @@ delay to start tests. Used for debug mode on waiting for debug attached.
 
     node nunit.js --delay=1000
 
---reportpath=[path]
+--reports-path=[path]
 
-Path where to generate reports. Defaults to reports.
+Path where to generate reports parsable by Jenkins. Defaults to reports.
 
-    node nunit.js --reportpath=reportfolder
+    node nunit.js --reports-path=reportfolder
+
+--sonar-reports-path=[path]
+
+Path where to generate SonarQube reports. Defaults to sonar-reports.
+
+    node nunit.js --sonar-reports-path=reportfolder
 
 --verbose
 

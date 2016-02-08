@@ -12,9 +12,18 @@ var AssertionError = require('assert').AssertionError;
 var rimraf = require('rimraf');
 var js2xmlparser = require('js2xmlparser');
 
-var REPORT_PATH = "./reports";
+var REPORTS_PATH = "./reports";
+var SONAR_REPORTS_PATH = "./sonar-reports";
+var BASE_DIR = "src/test/js";
 
 var currentContext = { disposed : true };
+
+var UNIT_TEST = {
+    "@":{
+        "version":"1"
+    },
+    "file":[]
+};
 
 /********************** main ****************************/
 exports.run = function (args) {
@@ -24,16 +33,36 @@ exports.run = function (args) {
     var reporter = new Reporter(params["--verbose"]);
     reporter.version();
 
-    if(params["--reportpath"] !== undefined){
-        REPORT_PATH = params["--reportpath"];
+    if(params["--reports-path"] !== undefined){
+        REPORTS_PATH = params["--reports-path"];
     }
+    if(params["--sonar-reports-path"] !== undefined){
+        SONAR_REPORTS_PATH = params["--sonar-reports-path"];
+    }
+    if(params["--base-dir"] !== undefined){
+        BASE_DIR = params["--base-dir"]
+    }
+
+
     try {
-        rimraf.sync(REPORT_PATH);
+        rimraf.sync(REPORTS_PATH);
     }catch (error){
         console.log("rimraf error " + error);
     }
     try{
-        fs.mkdirSync(REPORT_PATH);
+        fs.mkdirSync(REPORTS_PATH);
+    }catch(error){
+        console.log("mkdirSync error " + error);
+    }
+
+
+    try {
+        rimraf.sync(SONAR_REPORTS_PATH);
+    }catch (error){
+        console.log("rimraf error " + error);
+    }
+    try{
+        fs.mkdirSync(SONAR_REPORTS_PATH);
     }catch(error){
         console.log("mkdirSync error " + error);
     }
@@ -265,6 +294,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
     var startDate;
 
     var name = path.basename(path.relative("",fixture).split('/').join('.'),".js");
+    var fileName = BASE_DIR + "/" + path.relative("", fixture);
 
     this.testsuite = {
 
@@ -275,11 +305,19 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 
     };
 
+    this.unitTest = {
+            "@":{
+                "path":fileName
+            },
+            "testCase":[]
+    };
+
     this.run = function(done) {
         var self = this;
         startDate = new Date();
 
         reporter.testsuite = this.testsuite;
+        reporter.unitTest = this.unitTest;
 
         reporter.fixtureStart(fixture);
 
@@ -294,7 +332,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
         var testNames = getTestToExecute(testModule, selectedTest);
 
         runFixtureSetUp(testNames, testModule, fixtureDone, function(){
-            runNextTest(testNames, testModule, self.testsuite, function(){
+            runNextTest(testNames, testModule, self.testsuite, self.unitTest, function(){
                 runFixtureTearDown(testNames, testModule, fixtureDone, function(){
                     fixtureDone();
                 });
@@ -332,7 +370,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
         context.start();
     };
 
-    var runNextTest = function(testNames, testModule, testsuite, callback){
+    var runNextTest = function(testNames, testModule, testsuite, unitTest, callback){
 
         if (testNames.length == 0){
             callback();
@@ -343,7 +381,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
 
         var testName = testNames.shift();
 
-        var testRunner = new TestRunner(reporter, testModule, testName, testsuite);
+        var testRunner = new TestRunner(reporter, testModule, testName, testsuite, unitTest);
         testRunner.run(function(success){
 
             if (success)
@@ -351,7 +389,7 @@ function FixtureRunner(reporter, fixture, selectedTest) {
             else
                 result.failed++;
 
-            runNextTest(testNames, testModule, testsuite, callback);
+            runNextTest(testNames, testModule, testsuite, unitTest, callback);
         });
     };
 
@@ -428,8 +466,14 @@ function Result(){
 }
 
 /********************** Test Runner ****************************/
-function TestRunner(reporter, module, testName, testsuite) {
+function TestRunner(reporter, module, testName, testsuite, unitTest) {
 
+    this.testCase = {
+        "@":{
+            "name":testName,
+            "duration":0
+        }
+    };
 
     this.testcase = {
         "@":{
@@ -440,6 +484,8 @@ function TestRunner(reporter, module, testName, testsuite) {
     var self = this;
     testsuite.testcase.push(this.testcase);
     this.testsuite = testsuite;
+    unitTest.testCase.push(this.testCase);
+    this.unitTest = unitTest;
 
 
     this.duration = 0;
@@ -452,9 +498,12 @@ function TestRunner(reporter, module, testName, testsuite) {
                     done(true);
                 });
             },function(){
+                self.durtation = new Date().getMilliseconds() - self.duration;
                 if(self.testsuite && self.testsuite.testcase !== undefined){
-                    self.durtation = new Date().getMilliseconds() - self.duration;
                     self.testcase["@"].time = self.duration/1000.0;
+                }
+                if(self.unitTest && self.unitTest.testCase !== undefined){
+                    self.testCase["@"].duration = self.duration;
                 }
 
             });
@@ -493,6 +542,7 @@ function TestRunner(reporter, module, testName, testsuite) {
 
         var context = new Context();
         context.testcase = testRunner.testcase;
+        context.testCase = testRunner.testCase;
 
         currentContext = context;
 
@@ -529,6 +579,14 @@ function TestRunner(reporter, module, testName, testsuite) {
                 },
                 "#":stack
             };
+
+            this.testCase.failure = {
+                "@":{
+                    "message" : message
+                },
+                "#":stack
+            };
+
             reporter.contextDone(testName, error);
             alwaysCallback();
             done(false);
@@ -673,23 +731,40 @@ function Reporter(verbose) {
 
     this.fixtureDone = function (fixture, result) {
 
+        UNIT_TEST.file.push(this.unitTest);
         this.testsuite["@"].time = result.duration / 1000.0;
         this.testsuite["@"].tests = result.total;
         this.testsuite["@"].failures = result.failed;
         var options = {useCDATA:true};
         var report = js2xmlparser("testsuite",this.testsuite,options);
-        fs.writeFile(REPORT_PATH +"/TEST-"+ this.testsuite["@"].name + ".xml", report, function(err){
+
+        fs.writeFile(REPORTS_PATH +"/TEST-"+ this.testsuite["@"].name + ".xml", report, function(err){
             if(err){
                 return console.log(err);
 
             }
         });
+
+
+
+
+
         console.log('\n\n' + "------ Fixture end ----------------------");
         console.log(result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.');
         console.log("-----------------------------------------");
     };
 
     this.done = function (result) {
+
+        var options = {useCDATA:true};
+        var report = js2xmlparser( "unitTest",UNIT_TEST,options);
+
+        fs.writeFile(SONAR_REPORTS_PATH+"/report.xml", report, function(err){
+            if(err){
+                return console.log(err);
+
+            }
+        });
 
         console.log('\n\n' + '========== Total: ' + result.total + ' tests, ' + result.passed + ' passed, ' + result.failed + ' failed, took ' + result.duration + 'ms.  ==========\n\n');
     };
