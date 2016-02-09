@@ -15,7 +15,7 @@ Usage
 -----
 
 Here is an example unit test fixture module:
-sample_fixture.js
+fixtures/sample_fixture.js
 
     var assert = require("assert");
 
@@ -31,11 +31,33 @@ sample_fixture.js
 
 Here the command line to run:
 
-    node nunit.js --path="sample_fixture.js"
+    node nunit.js --path="fixtures/sample_fixture.js"
 
-When run, this will output the following:
+When run, this will output the following xml report:
 
-  image
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fixtures.sample_fixture" time="0.006" tests="2" failures="1">
+    <testcase name="testSomething" time="0"/>
+    <testcase name="testSomethingElse" time="0.162">
+        <failure message="this assertion should fail" type="AssertionError"><![CDATA[actual: false
+expected: true
+operator: ==
+AssertionError: this assertion should fail
+    at Object.exports.testSomethingElse (/path/to/project/fixtures/sample_fixture.js:9:12)
+    at Context.startDelegate (/path/to/project/nunit.js:501:29)
+    at Context.start (/path/to/project/nunit.js:608:18)
+    at runTest (/path/to/project/nunit.js:542:17)
+    at /path/to/project/nunit.js:450:13
+    at setUp (/path/to/project/nunit.js:468:13)
+    at TestRunner.run (/path/to/project/nunit.js:449:9)
+    at FixtureRunner.runNextTest (/path/to/project/nunit.js:347:20)
+    at /path/to/project/nunit.js:354:13
+    at /path/to/project/nunit.js:452:21]]></failure>
+    </testcase>
+</testsuite>
+
+```
 
 
 Command-line arguments
@@ -50,19 +72,31 @@ Multiple Path are allowed with comma separated.
     
     node nunit.js --path=folder1,folder2
     
-    node nunit.js --path=sample1_fixture.js,sample2_fixture.js
+    node nunit.js --path=fixtures/sample1_fixture.js,fixtures/sample2_fixture.js
 
 --test=[test name]
 
 Test function name to execute alone.
 
-    node nunit.js --path=sample_fixture.js --test=testSomething
+    node nunit.js --path=fixtures/sample_fixture.js --test=testSomething
 
 --delay=[Milliseconds]
 
 delay to start tests. Used for debug mode on waiting for debug attached.
 
     node nunit.js --delay=1000
+
+--reports-path=[path]
+
+Path where to generate reports parsable by Jenkins. Defaults to reports.
+
+    node nunit.js --reports-path=reportfolder
+
+--sonar-reports-path=[path]
+
+Path where to generate SonarQube reports. Defaults to sonar-reports.
+
+    node nunit.js --sonar-reports-path=reportfolder
 
 --verbose
 

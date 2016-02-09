@@ -1,0 +1,10 @@
+{
+  "dependencies" :
+  {
+    "fs" : "latest",
+    "path" : "latest",
+    "js2xmlparser" : "latest",
+    "rimraf" : "latest",
+    "assert" : "latest"
+  }
+}
